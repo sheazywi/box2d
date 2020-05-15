@@ -32,8 +32,6 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 							const b2EdgeShape* edgeA, const b2Transform& xfA,
 							const b2CircleShape* circleB, const b2Transform& xfB)
 {
-	b2Assert(false && "update smooth");
-
 	manifold->pointCount = 0;
 	
 	// Compute circle in frame of edge
@@ -42,6 +40,21 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 	b2Vec2 A = edgeA->m_vertex1, B = edgeA->m_vertex2;
 	b2Vec2 e = B - A;
 	
+	b2Vec2 n(e.y, -e.x);
+	if (b2Dot(n, Q - A) <= 0.0f)
+	{
+		if (edgeA->m_smooth)
+		{
+			// One-sided
+			return;
+		}
+		else
+		{
+			n = -n;
+		}
+	}
+	n.Normalize();
+
 	// Barycentric coordinates
 	float u = b2Dot(e, B - Q);
 	float v = b2Dot(e, Q - A);
@@ -138,14 +151,7 @@ void b2CollideEdgeAndCircle(b2Manifold* manifold,
 	{
 		return;
 	}
-	
-	b2Vec2 n(-e.y, e.x);
-	if (b2Dot(n, Q - A) < 0.0f)
-	{
-		n.Set(-n.x, -n.y);
-	}
-	n.Normalize();
-	
+		
 	cf.indexA = 0;
 	cf.typeA = b2ContactFeature::e_face;
 	manifold->pointCount = 1;
@@ -250,23 +256,32 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	edge1.Normalize();
 	m_normal1.Set(edge1.y, -edge1.x);
 	float offset1 = b2Dot(m_normal1, m_centroidB - m_v1);
-	float offset0 = 0.0f, offset2 = 0.0f;
-	bool convex1 = false, convex2 = false;
+	if (offset1 <= 0.0f)
+	{
+		if (m_smooth)
+		{
+			// One-sided
+			return;
+		}
+		else
+		{
+			m_normal1 = -m_normal1;
+		}
+	}
 	
 	// Smooth collision uses adjacent vertices
 	if (m_smooth)
 	{
+		bool convex1 = false, convex2 = false;
 		b2Vec2 edge0 = m_v1 - m_v0;
 		edge0.Normalize();
 		m_normal0.Set(edge0.y, -edge0.x);
 		convex1 = b2Cross(edge0, edge1) >= 0.0f;
-		offset0 = b2Dot(m_normal0, m_centroidB - m_v0);
 
 		b2Vec2 edge2 = m_v3 - m_v2;
 		edge2.Normalize();
 		m_normal2.Set(edge2.y, -edge2.x);
 		convex2 = b2Cross(edge1, edge2) > 0.0f;
-		offset2 = b2Dot(m_normal2, m_centroidB - m_v2);
 
 		// Determine collision normal limits.
 		if (convex1 && convex2)

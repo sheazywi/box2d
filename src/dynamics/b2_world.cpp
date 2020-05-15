@@ -1067,32 +1067,37 @@ void b2World::DrawShape(b2Fixture* fixture, const b2Transform& xf, const b2Color
 			int32 count = chain->m_count;
 			const b2Vec2* vertices = chain->m_vertices;
 
-			b2Color ghostColor(0.75f * color.r, 0.75f * color.g, 0.75f * color.b, color.a);
+			//b2Color ghostColor(0.75f * color.r, 0.75f * color.g, 0.75f * color.b, color.a);
+			b2Color arrowColor(0.6f, 0.6f, 0.6f);
 
 			b2Vec2 v1 = b2Mul(xf, vertices[0]);
-			m_debugDraw->DrawPoint(v1, 4.0f, color);
+			//m_debugDraw->DrawPoint(v1, 4.0f, color);
 
-			if (chain->m_hasPrevVertex)
-			{
-				b2Vec2 vp = b2Mul(xf, chain->m_prevVertex);
-				m_debugDraw->DrawSegment(vp, v1, ghostColor);
-				m_debugDraw->DrawCircle(vp, 0.1f, ghostColor);
-			}
+			//if (chain->m_hasPrevVertex)
+			//{
+			//	b2Vec2 vp = b2Mul(xf, chain->m_prevVertex);
+			//	m_debugDraw->DrawSegment(vp, v1, ghostColor);
+			//	m_debugDraw->DrawCircle(vp, 0.1f, ghostColor);
+			//}
 
 			for (int32 i = 1; i < count; ++i)
 			{
 				b2Vec2 v2 = b2Mul(xf, vertices[i]);
 				m_debugDraw->DrawSegment(v1, v2, color);
-				m_debugDraw->DrawPoint(v2, 4.0f, color);
+				b2Vec2 e = v2 - v1;
+				e.Normalize();
+				b2Vec2 n(e.y, -e.x);
+				m_debugDraw->DrawSegment(v2, v2 + 8.0f * b2_polygonRadius * (n - e) , arrowColor);
+				//m_debugDraw->DrawPoint(v2, 4.0f, color);
 				v1 = v2;
 			}
 
-			if (chain->m_hasNextVertex)
-			{
-				b2Vec2 vn = b2Mul(xf, chain->m_nextVertex);
-				m_debugDraw->DrawSegment(v1, vn, ghostColor);
-				m_debugDraw->DrawCircle(vn, 0.1f, ghostColor);
-			}
+			//if (chain->m_hasNextVertex)
+			//{
+			//	b2Vec2 vn = b2Mul(xf, chain->m_nextVertex);
+			//	m_debugDraw->DrawSegment(v1, vn, ghostColor);
+			//	m_debugDraw->DrawCircle(vn, 0.1f, ghostColor);
+			//}
 		}
 		break;
 
