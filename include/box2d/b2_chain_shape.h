@@ -30,6 +30,8 @@ class b2EdgeShape;
 /// A chain shape is a free form sequence of line segments.
 /// The chain has two-sided collision, so you can use inside and outside collision.
 /// Therefore, you may use any winding order.
+/// The chain can also be configured as a one-sided loop. This allows for smooth
+/// collision by using edge connectivity.
 /// Since there may be many vertices, they are allocated using b2Alloc.
 /// Connectivity information is used to create smooth collisions.
 /// WARNING: The chain will not collide properly if there are self-intersections.
@@ -44,23 +46,21 @@ public:
 	/// Clear all data.
 	void Clear();
 
-	/// Create a loop. This automatically adjusts connectivity.
+	/// Create a two-sided loop.
 	/// @param vertices an array of vertices, these are copied
 	/// @param count the vertex count
-	void CreateLoop(const b2Vec2* vertices, int32 count);
+	void CreateTwoSidedLoop(const b2Vec2* vertices, int32 count);
 
-	/// Create a chain with isolated end vertices.
+	/// Create a two-sided chain with isolated end vertices.
 	/// @param vertices an array of vertices, these are copied
 	/// @param count the vertex count
-	void CreateChain(const b2Vec2* vertices, int32 count);
+	void CreateTwoSidedChain(const b2Vec2* vertices, int32 count);
 
-	/// Establish connectivity to a vertex that precedes the first vertex.
-	/// Don't call this for loops.
-	void SetPrevVertex(const b2Vec2& prevVertex);
-
-	/// Establish connectivity to a vertex that follows the last vertex.
-	/// Don't call this for loops.
-	void SetNextVertex(const b2Vec2& nextVertex);
+	/// Create a one-sided loop with smooth collision. A counter-clockwise
+	/// winding order creates outward normals.
+	/// @param vertices an array of vertices, these are copied
+	/// @param count the vertex count
+	void CreateOneSidedLoop(const b2Vec2* vertices, int32 count);
 
 	/// Implement b2Shape. Vertices are cloned using b2Alloc.
 	b2Shape* Clone(b2BlockAllocator* allocator) const override;
@@ -92,8 +92,7 @@ public:
 	/// The vertex count.
 	int32 m_count;
 
-	b2Vec2 m_prevVertex, m_nextVertex;
-	bool m_hasPrevVertex, m_hasNextVertex;
+	bool m_loop;
 };
 
 inline b2ChainShape::b2ChainShape()
@@ -102,8 +101,6 @@ inline b2ChainShape::b2ChainShape()
 	m_radius = b2_polygonRadius;
 	m_vertices = nullptr;
 	m_count = 0;
-	m_hasPrevVertex = false;
-	m_hasNextVertex = false;
 }
 
 #endif

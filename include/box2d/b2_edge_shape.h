@@ -25,12 +25,31 @@
 
 #include "b2_shape.h"
 
+///
+enum b2EdgeShapeType
+{
+
+};
 /// A line segment (edge) shape. These can be connected in chains or loops
-/// to other edge shapes. The connectivity information is used to ensure
-/// correct contact normals.
+/// to other edge shapes.
 class b2EdgeShape : public b2Shape
 {
 public:
+
+	/// There are two edge options:
+	/// - two-sided (default)
+	/// - one-sided with smooth connectivity
+	/// One-sided edges only collide with convex shapes that have their centroid
+	/// to the right side of the axis pointing from vertex1 to vertex2.
+	/// One-sided edges must have ghost vertices. These are used to provide smooth
+	/// collision along connected edges. The ghost vertices must match the
+	/// far vertices of connected edges.
+	enum Sided
+	{
+		e_twoSided,
+		e_oneSided,
+	};
+
 	b2EdgeShape();
 
 	/// Set this as an isolated edge.
@@ -58,9 +77,10 @@ public:
 	/// These are the edge vertices
 	b2Vec2 m_vertex1, m_vertex2;
 
-	/// Optional adjacent vertices. These are used for smooth collision.
+	/// Ghost vertices for smooth one-sided collision
 	b2Vec2 m_vertex0, m_vertex3;
-	bool m_hasVertex0, m_hasVertex3;
+
+	Sided m_sided;
 };
 
 inline b2EdgeShape::b2EdgeShape()
@@ -71,8 +91,7 @@ inline b2EdgeShape::b2EdgeShape()
 	m_vertex0.y = 0.0f;
 	m_vertex3.x = 0.0f;
 	m_vertex3.y = 0.0f;
-	m_hasVertex0 = false;
-	m_hasVertex3 = false;
+	m_sided = e_twoSided;
 }
 
 #endif

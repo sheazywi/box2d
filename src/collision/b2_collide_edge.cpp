@@ -167,6 +167,7 @@ struct b2EPAxis
 	
 	Type type;
 	int32 index;
+	b2Vec2 normal;
 	float separation;
 };
 
@@ -214,23 +215,12 @@ struct b2EPCollider
 	b2Transform m_xf;
 	b2Vec2 m_centroidB;
 	b2Vec2 m_v0, m_v1, m_v2, m_v3;
-	b2Vec2 m_normal0, m_normal1, m_normal2;
-	b2Vec2 m_normal;
+	b2Vec2 m_normal1;
 	VertexType m_type1, m_type2;
-	b2Vec2 m_lowerLimit, m_upperLimit;
 	float m_radius;
-	bool m_front;
 };
 
-// Algorithm:
-// 1. Classify v1 and v2
-// 2. Classify polygon centroid as front or back
-// 3. Flip normal if necessary
-// 4. Initialize normal range to [-pi, pi] about face normal
-// 5. Adjust normal range according to adjacent edges
-// 6. Visit each separating axes, only accept axes within the range
-// 7. Return if _any_ axis indicates separation
-// 8. Clip
+//
 void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const b2Transform& xfA,
 						   const b2PolygonShape* polygonB, const b2Transform& xfB)
 {
@@ -243,190 +233,9 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	m_v2 = edgeA->m_vertex2;
 	m_v3 = edgeA->m_vertex3;
 	
-	bool hasVertex0 = edgeA->m_hasVertex0;
-	bool hasVertex3 = edgeA->m_hasVertex3;
-	
 	b2Vec2 edge1 = m_v2 - m_v1;
 	edge1.Normalize();
 	m_normal1.Set(edge1.y, -edge1.x);
-	float offset1 = b2Dot(m_normal1, m_centroidB - m_v1);
-	float offset0 = 0.0f, offset2 = 0.0f;
-	bool convex1 = false, convex2 = false;
-	
-	// Is there a preceding edge?
-	if (hasVertex0)
-	{
-		b2Vec2 edge0 = m_v1 - m_v0;
-		edge0.Normalize();
-		m_normal0.Set(edge0.y, -edge0.x);
-		convex1 = b2Cross(edge0, edge1) >= 0.0f;
-		offset0 = b2Dot(m_normal0, m_centroidB - m_v0);
-	}
-	
-	// Is there a following edge?
-	if (hasVertex3)
-	{
-		b2Vec2 edge2 = m_v3 - m_v2;
-		edge2.Normalize();
-		m_normal2.Set(edge2.y, -edge2.x);
-		convex2 = b2Cross(edge1, edge2) > 0.0f;
-		offset2 = b2Dot(m_normal2, m_centroidB - m_v2);
-	}
-	
-	// Determine front or back collision. Determine collision normal limits.
-	if (hasVertex0 && hasVertex3)
-	{
-		if (convex1 && convex2)
-		{
-			m_front = offset0 >= 0.0f || offset1 >= 0.0f || offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = -m_normal1;
-			}
-		}
-		else if (convex1)
-		{
-			m_front = offset0 >= 0.0f || (offset1 >= 0.0f && offset2 >= 0.0f);
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = -m_normal1;
-			}
-		}
-		else if (convex2)
-		{
-			m_front = offset2 >= 0.0f || (offset0 >= 0.0f && offset1 >= 0.0f);
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = -m_normal0;
-			}
-		}
-		else
-		{
-			m_front = offset0 >= 0.0f && offset1 >= 0.0f && offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = -m_normal0;
-			}
-		}
-	}
-	else if (hasVertex0)
-	{
-		if (convex1)
-		{
-			m_front = offset0 >= 0.0f || offset1 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal0;
-				m_upperLimit = -m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal1;
-			}
-		}
-		else
-		{
-			m_front = offset0 >= 0.0f && offset1 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = m_normal1;
-				m_upperLimit = -m_normal0;
-			}
-		}
-	}
-	else if (hasVertex3)
-	{
-		if (convex2)
-		{
-			m_front = offset1 >= 0.0f || offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal2;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal1;
-			}
-		}
-		else
-		{
-			m_front = offset1 >= 0.0f && offset2 >= 0.0f;
-			if (m_front)
-			{
-				m_normal = m_normal1;
-				m_lowerLimit = -m_normal1;
-				m_upperLimit = m_normal1;
-			}
-			else
-			{
-				m_normal = -m_normal1;
-				m_lowerLimit = -m_normal2;
-				m_upperLimit = m_normal1;
-			}
-		}		
-	}
-	else
-	{
-		m_front = offset1 >= 0.0f;
-		if (m_front)
-		{
-			m_normal = m_normal1;
-			m_lowerLimit = -m_normal1;
-			m_upperLimit = -m_normal1;
-		}
-		else
-		{
-			m_normal = -m_normal1;
-			m_lowerLimit = m_normal1;
-			m_upperLimit = m_normal1;
-		}
-	}
 	
 	// Get polygonB in frameA
 	m_polygonB.count = polygonB->m_count;
@@ -441,36 +250,83 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	manifold->pointCount = 0;
 	
 	b2EPAxis edgeAxis = ComputeEdgeSeparation();
-	
-	// If no valid normal can be found than this edge should not collide.
-	if (edgeAxis.type == b2EPAxis::e_unknown)
-	{
-		return;
-	}
-	
 	if (edgeAxis.separation > m_radius)
 	{
+		// No collision
 		return;
 	}
 	
 	b2EPAxis polygonAxis = ComputePolygonSeparation();
-	if (polygonAxis.type != b2EPAxis::e_unknown && polygonAxis.separation > m_radius)
+	if (polygonAxis.separation > m_radius)
 	{
+		// No collision
 		return;
 	}
-	
+
 	// Use hysteresis for jitter reduction.
 	const float k_relativeTol = 0.98f;
 	const float k_absoluteTol = 0.001f;
 	
 	b2EPAxis primaryAxis;
-	if (polygonAxis.type == b2EPAxis::e_unknown)
+	if (polygonAxis.separation > k_relativeTol * edgeAxis.separation + k_absoluteTol)
 	{
-		primaryAxis = edgeAxis;
-	}
-	else if (polygonAxis.separation > k_relativeTol * edgeAxis.separation + k_absoluteTol)
-	{
-		primaryAxis = polygonAxis;
+		const float sinTol = 0.1f;
+		b2Vec2 n = polygonAxis.normal;
+
+		bool valid1 = true;
+		if (edgeA->m_hasVertex0 && false)
+		{
+			// Ensure smooth collision around vertex 1
+			b2Vec2 edge0 = m_v1 - m_v0;
+			edge0.Normalize();
+			b2Vec2 normal0(edge0.y, -edge0.x);
+
+			bool convex1 = b2Cross(edge0, edge1) >= 0.0f;
+			if (convex1)
+			{
+				valid1 = b2Cross(n, m_normal1) > -sinTol && b2Cross(n, normal0) < sinTol;
+			}
+			else
+			{
+				valid1 = b2Cross(-m_normal1, n) > -sinTol && b2Cross(-normal0, n) < sinTol;
+			}
+		}
+		else
+		{
+			valid1 = b2Dot(n, edge1) < 0.0f;
+		}
+
+		bool valid2 = true;
+		if (edgeA->m_hasVertex3 && false)
+		{
+			// Ensure smooth collision around vertex 1
+			b2Vec2 edge3 = m_v3 - m_v2;
+			edge3.Normalize();
+			b2Vec2 normal3(edge3.y, -edge3.x);
+
+			bool convex2 = b2Cross(edge1, edge3) >= 0.0f;
+			if (convex2)
+			{
+				valid2 = b2Cross(m_normal1, n) > -sinTol && b2Cross(normal3, n) < sinTol;
+			}
+			else
+			{
+				valid2 = b2Cross(n, -m_normal1) > -sinTol && b2Cross(n, -normal3) < sinTol;
+			}
+		}
+		else
+		{
+			valid2 = b2Dot(n, edge1) > 0.0f;
+		}
+
+		if (valid1 || valid2)
+		{
+			primaryAxis = polygonAxis;
+		}
+		else
+		{
+			primaryAxis = edgeAxis;
+		}
 	}
 	else
 	{
@@ -483,12 +339,14 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 	{
 		manifold->type = b2Manifold::e_faceA;
 		
+		b2Vec2 normalA = primaryAxis.index == 0 ? m_normal1 : -m_normal1;
+
 		// Search for the polygon normal that is most anti-parallel to the edge normal.
 		int32 bestIndex = 0;
-		float bestValue = b2Dot(m_normal, m_polygonB.normals[0]);
+		float bestValue = b2Dot(normalA, m_polygonB.normals[0]);
 		for (int32 i = 1; i < m_polygonB.count; ++i)
 		{
-			float value = b2Dot(m_normal, m_polygonB.normals[i]);
+			float value = b2Dot(normalA, m_polygonB.normals[i]);
 			if (value < bestValue)
 			{
 				bestValue = value;
@@ -500,18 +358,18 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 		int32 i2 = i1 + 1 < m_polygonB.count ? i1 + 1 : 0;
 		
 		ie[0].v = m_polygonB.vertices[i1];
-		ie[0].id.cf.indexA = 0;
+		ie[0].id.cf.indexA = primaryAxis.index;
 		ie[0].id.cf.indexB = static_cast<uint8>(i1);
 		ie[0].id.cf.typeA = b2ContactFeature::e_face;
 		ie[0].id.cf.typeB = b2ContactFeature::e_vertex;
 		
 		ie[1].v = m_polygonB.vertices[i2];
-		ie[1].id.cf.indexA = 0;
+		ie[1].id.cf.indexA = primaryAxis.index;
 		ie[1].id.cf.indexB = static_cast<uint8>(i2);
 		ie[1].id.cf.typeA = b2ContactFeature::e_face;
 		ie[1].id.cf.typeB = b2ContactFeature::e_vertex;
 		
-		if (m_front)
+		if (primaryAxis.index == 0)
 		{
 			rf.i1 = 0;
 			rf.i2 = 1;
@@ -539,7 +397,7 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 		ie[0].id.cf.typeB = b2ContactFeature::e_face;
 		
 		ie[1].v = m_v2;
-		ie[1].id.cf.indexA = 0;
+		ie[1].id.cf.indexA = 1;
 		ie[1].id.cf.indexB = static_cast<uint8>(primaryAxis.index);		
 		ie[1].id.cf.typeA = b2ContactFeature::e_vertex;
 		ie[1].id.cf.typeB = b2ContactFeature::e_face;
@@ -623,18 +481,43 @@ void b2EPCollider::Collide(b2Manifold* manifold, const b2EdgeShape* edgeA, const
 
 b2EPAxis b2EPCollider::ComputeEdgeSeparation()
 {
-	b2EPAxis axis;
-	axis.type = b2EPAxis::e_edgeA;
-	axis.index = m_front ? 0 : 1;
-	axis.separation = FLT_MAX;
-	
+	float s1 = FLT_MAX, s2 = FLT_MAX;
+	int32 index1 = 0, index2 = 0;
+
 	for (int32 i = 0; i < m_polygonB.count; ++i)
 	{
-		float s = b2Dot(m_normal, m_polygonB.vertices[i] - m_v1);
-		if (s < axis.separation)
+		// Compute separation of polygon vertex above edge
+		float s = b2Dot(m_normal1, m_polygonB.vertices[i] - m_v1);
+		
+		if (s < s1)
 		{
-			axis.separation = s;
+			// Edge front side
+			s1 = s;
+			index1 = i;
 		}
+		
+		if (-s < s2)
+		{
+			// Edge back
+			s2 = -s;
+			index2 = i;
+		}
+	}
+
+	b2EPAxis axis;
+	axis.type = b2EPAxis::e_edgeA;
+
+	if (s1 > s2)
+	{
+		axis.index = 0;
+		axis.separation = s1;
+		axis.normal = m_normal1;
+	}
+	else
+	{
+		axis.index = 1;
+		axis.separation = s2;
+		axis.normal = -m_normal1;
 	}
 	
 	return axis;
@@ -643,50 +526,24 @@ b2EPAxis b2EPCollider::ComputeEdgeSeparation()
 b2EPAxis b2EPCollider::ComputePolygonSeparation()
 {
 	b2EPAxis axis;
-	axis.type = b2EPAxis::e_unknown;
+	axis.type = b2EPAxis::e_edgeB;
 	axis.index = -1;
 	axis.separation = -FLT_MAX;
 
-	b2Vec2 perp(-m_normal.y, m_normal.x);
-
 	for (int32 i = 0; i < m_polygonB.count; ++i)
 	{
-		b2Vec2 n = -m_polygonB.normals[i];
-		
-		float s1 = b2Dot(n, m_polygonB.vertices[i] - m_v1);
-		float s2 = b2Dot(n, m_polygonB.vertices[i] - m_v2);
+		// Compute separation of edge above polygon face
+		b2Vec2 n = m_polygonB.normals[i];
+		b2Vec2 v = m_polygonB.vertices[i];
+		float s1 = b2Dot(n, m_v1 - v);
+		float s2 = b2Dot(n, m_v2 - v);
 		float s = b2Min(s1, s2);
-		
-		if (s > m_radius)
-		{
-			// No collision
-			axis.type = b2EPAxis::e_edgeB;
-			axis.index = i;
-			axis.separation = s;
-			return axis;
-		}
-		
-		// Adjacency
-		if (b2Dot(n, perp) >= 0.0f)
-		{
-			if (b2Dot(n - m_upperLimit, m_normal) < -b2_angularSlop)
-			{
-				continue;
-			}
-		}
-		else
-		{
-			if (b2Dot(n - m_lowerLimit, m_normal) < -b2_angularSlop)
-			{
-				continue;
-			}
-		}
 		
 		if (s > axis.separation)
 		{
-			axis.type = b2EPAxis::e_edgeB;
 			axis.index = i;
 			axis.separation = s;
+			axis.normal = -n;
 		}
 	}
 	
